@@ -37,6 +37,12 @@ $('#candidateTemplate').onclick=()=>download('modelo-candidatos.csv','text/csv;c
 
 function exportControleEleitoral(){
  if(typeof XLSX==='undefined'){alert('Biblioteca do Excel não carregou.');return}
+ const exportKey='auditabu2026.export.seq';
+ const exportSeq=(parseInt(localStorage.getItem(exportKey)||'0',10)||0)+1;
+ localStorage.setItem(exportKey,String(exportSeq));
+ const exportNo=String(exportSeq).padStart(3,'0');
+ const agora=new Date();
+ const exportStamp=agora.toLocaleString('pt-BR');
  const bus=db.bus.filter(b=>(!b.meta.uf||b.meta.uf==='SP')&&String(+b.meta.zona||b.meta.zona)==='54').slice().sort((a,b)=>(+a.meta.secao||0)-(+b.meta.secao||0));
  if(!bus.length){alert('Não há BUs da Zona 054 para exportar.');return}
  const bm='55855', schoolMap=window.AUDITABU_ESCOLAS||{};
@@ -49,22 +55,22 @@ function exportControleEleitoral(){
  headers.push('PRES. BRANCOS','PRES. NULOS','PRES. VÁLIDOS','GOV. BRANCOS','GOV. NULOS','GOV. VÁLIDOS','BARROS MUNHOZ (55855)','DEP. EST. VÁLIDOS');
  const rows=[];
  for(const b of bus){const p=b.votes['1']||{},g=b.votes['3']||{},d=b.votes['7']||{};const pv=Object.values(p.nominal||{}).reduce((t,q)=>t+(+q||0),0),gv=Object.values(g.nominal||{}).reduce((t,q)=>t+(+q||0),0),dv=Object.values(d.nominal||{}).reduce((t,q)=>t+(+q||0),0);const comp=(+p.total||+g.total||+d.total||pv+(+p.branco||0)+(+p.nulo||0));let r=[String(+b.meta.secao||b.meta.secao),schoolMap[String(+b.meta.secao||b.meta.secao)]||'NÃO CADASTRADA',comp];pres.forEach(n=>r.push(+p.nominal?.[n]||0));gov.forEach(n=>r.push(+g.nominal?.[n]||0));r.push(+p.branco||0,+p.nulo||0,pv,+g.branco||0,+g.nulo||0,gv,+d.nominal?.[bm]||0,dv);rows.push(r)}
- const wb=XLSX.utils.book_new(), title='CONTROLE DE VOTAÇÃO — PRESIDENTE, GOVERNADOR E BARROS MUNHOZ';
- const ent=[[title],['Dados extraídos automaticamente dos Boletins de Urna capturados — Zona Eleitoral 054.'],[],headers,...rows];
+ const wb=XLSX.utils.book_new(), title='CONTROLE DE VOTAÇÃO — PRESIDENTE, GOVERNADOR E BARROS MUNHOZ — EXPORTAÇÃO Nº '+exportNo;
+ const ent=[[title],['Dados extraídos automaticamente dos Boletins de Urna capturados — Zona Eleitoral 054.'],['Exportação nº '+exportNo+' — '+exportStamp],[],headers,...rows];
  const ws1=XLSX.utils.aoa_to_sheet(ent);ws1['!cols']=headers.map((h,i)=>({wch:i===1?28:Math.max(12,Math.min(30,h.length+2))}));ws1['!freeze']={xSplit:2,ySplit:4};
  const schools=[...new Set(Object.values(schoolMap))].sort(), ph=['ESCOLA','TOTAL DE SEÇÕES','SEÇÕES APURADAS','COMPARECIMENTO'];
  cols.forEach(([c,ns])=>ns.forEach(n=>ph.push((c==='1'?'PRES. ':'GOV. ')+label(c,n))));ph.push('BM 55855','% SEÇÕES APURADAS','% COMPARECIMENTO');
  pres.forEach(n=>ph.push('% PRES. '+n+' / COMP.'));gov.forEach(n=>ph.push('% GOV. '+n+' / COMP.'));ph.push('% BM / COMP.');
- const par=[['RESULTADOS PARCIAIS POR ESCOLA — PRESIDENTE, GOVERNADOR E BARROS MUNHOZ'],['Percentuais atualizados automaticamente sobre as seções já apuradas.'],[],ph];
+ const par=[['RESULTADOS PARCIAIS POR ESCOLA — PRESIDENTE, GOVERNADOR E BARROS MUNHOZ — EXPORTAÇÃO Nº '+exportNo],['Percentuais atualizados automaticamente sobre as seções já apuradas.'],['Exportação nº '+exportNo+' — '+exportStamp],[],ph];
  const secTotal={};Object.values(schoolMap).forEach(x=>secTotal[x]=(secTotal[x]||0)+1);
  for(const sc of schools){const rr=rows.filter(r=>r[1]===sc);let out=[sc,secTotal[sc]||0,rr.length,rr.reduce((t,r)=>t+(+r[2]||0),0)],idx=3;pres.forEach((n,j)=>out.push(rr.reduce((t,r)=>t+(+r[idx+1+j]||0),0)));idx+=pres.length;gov.forEach((n,j)=>out.push(rr.reduce((t,r)=>t+(+r[idx+1+j]||0),0)));const bmIdx=headers.indexOf('BARROS MUNHOZ (55855)');out.push(rr.reduce((t,r)=>t+(+r[bmIdx]||0),0));let comp=out[3];out.push((secTotal[sc]||0)?rr.length/(secTotal[sc]||1):0,comp?comp/comp:0);const voteStart=4,voteEnd=voteStart+pres.length+gov.length;for(let i=voteStart;i<voteEnd;i++)out.push(comp?out[i]/comp:0);out.push(comp?out[voteEnd]/comp:0);par.push(out)}
  const ws2=XLSX.utils.aoa_to_sheet(par);ws2['!cols']=ph.map((h,i)=>({wch:i===0?28:Math.max(14,Math.min(28,h.length+2))}));
  for(let r=5;r<=par.length;r++)for(let c=ph.indexOf('% SEÇÕES APURADAS');c<ph.length;c++){let cell=XLSX.utils.encode_cell({r:r-1,c});if(ws2[cell])ws2[cell].z='0.00%'}
- const apH=['CARGO','NÚMERO','CANDIDATO','PARTIDO','VOTOS','% SOBRE COMPARECIMENTO'],ap=[['APURAÇÃO — PRESIDENTE, GOVERNADOR E BARROS MUNHOZ'],[],apH],compTot=rows.reduce((t,r)=>t+(+r[2]||0),0);
+ const apH=['CARGO','NÚMERO','CANDIDATO','PARTIDO','VOTOS','% SOBRE COMPARECIMENTO'],ap=[['APURAÇÃO — PRESIDENTE, GOVERNADOR E BARROS MUNHOZ — EXPORTAÇÃO Nº '+exportNo],['Exportação nº '+exportNo+' — '+exportStamp],[],apH],compTot=rows.reduce((t,r)=>t+(+r[2]||0),0);
  const add=(c,n,v,nome)=>{let ci=candidateInfo(c,n,'SP');ap.push([offices[c]||c,n,nome||ci.nome,ci.partido,v,compTot?v/compTot:0])};
  pres.forEach((n,j)=>add('1',n,rows.reduce((t,r)=>t+(+r[3+j]||0),0)));let gi=3+pres.length;gov.forEach((n,j)=>add('3',n,rows.reduce((t,r)=>t+(+r[gi+j]||0),0)));add('7',bm,rows.reduce((t,r)=>t+(+r[headers.indexOf('BARROS MUNHOZ (55855)')]||0),0),'Barros Munhoz');
  const ws3=XLSX.utils.aoa_to_sheet(ap);ws3['!cols']=[{wch:24},{wch:12},{wch:32},{wch:18},{wch:14},{wch:24}];for(let r=4;r<=ap.length;r++){let c='F'+r;if(ws3[c])ws3[c].z='0.00%'}
- XLSX.utils.book_append_sheet(wb,ws1,'ENTRADA DE DADOS');XLSX.utils.book_append_sheet(wb,ws2,'PARCIAIS POR ESCOLA');XLSX.utils.book_append_sheet(wb,ws3,'APURAÇÃO');XLSX.writeFile(wb,'CONTROLE_VOTACAO_PRES_GOV_BM.xlsx')
+ XLSX.utils.book_append_sheet(wb,ws1,'ENTRADA DE DADOS');XLSX.utils.book_append_sheet(wb,ws2,'PARCIAIS POR ESCOLA');XLSX.utils.book_append_sheet(wb,ws3,'APURAÇÃO');XLSX.writeFile(wb,'CONTROLE_VOTACAO_PRES_GOV_BM_EXP_'+exportNo+'.xlsx')
 }
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});render();refreshCentral();setInterval(refreshCentral,5000);window.addEventListener('focus',refreshCentral);
 
