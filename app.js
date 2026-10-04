@@ -57,3 +57,22 @@ function exportControleEleitoral(){
 }
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});render();refreshCentral();setInterval(refreshCentral,5000);window.addEventListener('focus',refreshCentral);
+
+const authClient=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
+async function loadAdmin(){
+ if(!authClient)return;
+ const {data:{session}}=await authClient.auth.getSession();
+ if(!session){$('#adminLogin')?.classList.remove('hidden');$('#adminPanel')?.classList.add('hidden');return}
+ const {data:ok}=await authClient.from('admin_users').select('email').eq('email',session.user.email).maybeSingle();
+ if(!ok){$('#adminMsg').textContent='Conta autenticada, mas este e-mail ainda não está autorizado como administrador.';await authClient.auth.signOut();return}
+ $('#adminLogin').classList.add('hidden');$('#adminPanel').classList.remove('hidden');$('#adminWho').textContent=session.user.email;
+ const {data, error}=await authClient.from('boletins').select('received_at,uf,municipio,zona,secao,urna,device_id').order('received_at',{ascending:false});
+ if(error){$('#adminMsg').textContent='Não foi possível carregar a base central.';return}
+ $('#adminBU').textContent=data.length;$('#adminSec').textContent=new Set(data.map(x=>[x.uf,x.zona,x.secao].join('|'))).size;
+ $('#adminRows').innerHTML=data.map(x=>'<tr><td>'+esc(new Date(x.received_at).toLocaleString('pt-BR'))+'</td><td>'+esc(x.uf)+'</td><td>'+esc(x.municipio)+'</td><td>'+esc(x.zona)+'</td><td>'+esc(x.secao)+'</td><td>'+esc(x.urna)+'</td><td>'+esc(x.device_id)+'</td></tr>').join('');
+ $('#adminMsg').textContent='Base central carregada.';
+}
+if($('#adminEnter'))$('#adminEnter').onclick=async()=>{try{let email=$('#adminEmail').value.trim(),password=$('#adminPass').value;let {error}=await authClient.auth.signInWithPassword({email,password});if(error)throw error;await loadAdmin()}catch(e){$('#adminMsg').textContent='Não foi possível entrar: '+e.message}};
+if($('#adminExit'))$('#adminExit').onclick=async()=>{await authClient.auth.signOut();await loadAdmin()};
+if($('#adminRefresh'))$('#adminRefresh').onclick=loadAdmin;
+setTimeout(loadAdmin,0);
