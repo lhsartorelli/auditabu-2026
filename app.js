@@ -112,31 +112,121 @@ function exportControleEleitoral(){
  ws3['!cols']=apHeaders.map((h,i)=>({wch:i===1?28:(String(h).includes('%')?13:Math.max(10,Math.min(18,String(h).length+1)))}));ws3['!freeze']={xSplit:2,ySplit:1};
  XLSX.utils.book_append_sheet(wb,ws3,'APURAÇÃO');
 
- // PARCIAIS POR ESCOLA - mesmos percentuais da APURAÇÃO
+ // PARCIAIS POR ESCOLA — separados em 3 abas: PRESIDENTE, GOVERNADOR e BM
  const schools=[...new Set(Object.values(schoolMap))].sort();
- const ph=['ESCOLA','TOTAL DE SEÇÕES','SEÇÕES APURADAS','ELEITORES DA ESCOLA','COMPARECIMENTO','PRES. VÁLIDOS'];
- pres.forEach(n=>ph.push('PRES. '+n,'PRES. '+n+' % COMPAR.','PRES. '+n+' % VÁL.','PRES. '+n+' % ELEITOR'));
- ph.push('GOV. VÁLIDOS');
- gov.forEach(n=>ph.push('GOV. '+n,'GOV. '+n+' % COMPAR.','GOV. '+n+' % VÁL.','GOV. '+n+' % ELEITOR'));
- ph.push('DEP. EST. VÁLIDOS','BM','BM % COMPAR.','BM % VÁL.','BM % ELEITOR','% SEÇÕES APURADAS');
- const par=[['RESULTADOS PARCIAIS POR ESCOLA — EXPORTAÇÃO Nº '+exportNo],['Atualização automática conforme os Boletins de Urna capturados | '+exportStamp],['Percentuais de cada candidato calculados sobre Comparecimento, Votos Válidos do cargo e Eleitores da escola.'],[],ph];
- schools.forEach(s=>par.push([s]));par.push(['TOTAL GERAL']);
- const ws2=XLSX.utils.aoa_to_sheet(par);
- ws2['!merges']=[{s:{r:0,c:0},e:{r:0,c:ph.length-1}},{s:{r:1,c:0},e:{r:1,c:ph.length-1}},{s:{r:2,c:0},e:{r:2,c:ph.length-1}}];
- setStyle(ws2,'A1:'+col(ph.length-1)+'1',titleStyle);setStyle(ws2,'A5:'+col(ph.length-1)+'5',headStyle);
  const apEnd=162, schoolCol="'APURAÇÃO'!$B$2:$B$"+apEnd, compCol="'APURAÇÃO'!$E$2:$E$"+apEnd;
  const apColByHeader={};apHeaders.forEach((h,i)=>apColByHeader[h]=col(i));
- for(let ri=0;ri<schools.length;ri++){const r=6+ri,s=schools[ri];ws2['B'+r]={t:'n',f:'COUNTIF(Planilha2!$B$2:$B$162,A'+r+')'};ws2['C'+r]={t:'n',f:'COUNTIFS('+schoolCol+',A'+r+','+compCol+',"<>")'};ws2['D'+r]={t:'n',f:'SUMIF(Planilha2!$B$2:$B$162,A'+r+',Planilha2!$C$2:$C$162)'};ws2['E'+r]={t:'n',f:'SUMIF('+schoolCol+',A'+r+','+compCol+')'};let pc=5;const putSum=(head)=>{const src=apColByHeader[head];ws2[col(pc)+r]={t:'n',f:'SUMIF('+schoolCol+',A'+r+',\'APURAÇÃO\'!$'+src+'$2:$'+src+'$'+apEnd+')'};return col(pc++)+r};const pValid=putSum('PRES. VÁLIDOS');pres.forEach(n=>{const v=putSum('PRES. '+n);ws2[col(pc)+r]={t:'n',f:'IFERROR('+v+'/$E'+r+',0)',z:'0.0%'};pc++;ws2[col(pc)+r]={t:'n',f:'IFERROR('+v+'/'+pValid+',0)',z:'0.0%'};pc++;ws2[col(pc)+r]={t:'n',f:'IFERROR('+v+'/$D'+r+',0)',z:'0.0%'};pc++;});const gValid=putSum('GOV. VÁLIDOS');gov.forEach(n=>{const v=putSum('GOV. '+n);ws2[col(pc)+r]={t:'n',f:'IFERROR('+v+'/$E'+r+',0)',z:'0.0%'};pc++;ws2[col(pc)+r]={t:'n',f:'IFERROR('+v+'/'+gValid+',0)',z:'0.0%'};pc++;ws2[col(pc)+r]={t:'n',f:'IFERROR('+v+'/$D'+r+',0)',z:'0.0%'};pc++;});const dValid=putSum('DEP. EST. VÁLIDOS'),bmv=putSum('BM');ws2[col(pc)+r]={t:'n',f:'IFERROR('+bmv+'/$E'+r+',0)',z:'0.0%'};pc++;ws2[col(pc)+r]={t:'n',f:'IFERROR('+bmv+'/'+dValid+',0)',z:'0.0%'};pc++;ws2[col(pc)+r]={t:'n',f:'IFERROR('+bmv+'/$D'+r+',0)',z:'0.0%'};pc++;ws2[col(pc)+r]={t:'n',f:'IFERROR($C'+r+'/$B'+r+',0)',z:'0.0%'};
-   const fill=ri%2?WHITE:ALT;setStyle(ws2,'A'+r+':'+col(ph.length-1)+r,{fill:{fgColor:{rgb:fill}},border:grid});
- }
- const tr=6+schools.length;for(let C=1;C<ph.length;C++){const L=col(C);if(C===1)ws2[L+tr]={t:'n',f:'SUM(B6:B'+(tr-1)+')'};else if(C===2)ws2[L+tr]={t:'n',f:'SUM(C6:C'+(tr-1)+')'};else if(C===3)ws2[L+tr]={t:'n',f:'SUM(D6:D'+(tr-1)+')'};else if(C===4)ws2[L+tr]={t:'n',f:'SUM(E6:E'+(tr-1)+')'};else if(ph[C].includes('%')){const baseHead=ph[C];if(baseHead==='% SEÇÕES APURADAS')ws2[L+tr]={t:'n',f:'IFERROR(C'+tr+'/B'+tr+',0)',z:'0.0%'};else {const parts=baseHead.split(' % '),voteHead=parts[0],voteC=ph.indexOf(voteHead),vL=col(voteC);if(baseHead.includes('% COMPAR.'))ws2[L+tr]={t:'n',f:'IFERROR('+vL+tr+'/E'+tr+',0)',z:'0.0%'};else if(baseHead.includes('% ELEITOR'))ws2[L+tr]={t:'n',f:'IFERROR('+vL+tr+'/D'+tr+',0)',z:'0.0%'};else {let den='';if(voteHead.startsWith('PRES.'))den=col(ph.indexOf('PRES. VÁLIDOS'));else if(voteHead.startsWith('GOV.'))den=col(ph.indexOf('GOV. VÁLIDOS'));else den=col(ph.indexOf('DEP. EST. VÁLIDOS'));ws2[L+tr]={t:'n',f:'IFERROR('+vL+tr+'/'+den+tr+',0)',z:'0.0%'};}}}else ws2[L+tr]={t:'n',f:'SUM('+L+'6:'+L+(tr-1)+')'};}
- setStyle(ws2,'A'+tr+':'+col(ph.length-1)+tr,{font:{bold:true,color:{rgb:WHITE}},fill:{fgColor:{rgb:BLUE}},border:grid,alignment:{horizontal:'center'}});
- for(let C=0;C<ph.length;C++)if(ph[C].includes('%'))for(let r=6;r<=tr;r++){const a=col(C)+r;if(ws2[a])ws2[a].s={...(ws2[a].s||{}),numFmt:'0.0%',alignment:{horizontal:'center'},border:grid};}
- ws2['!cols']=ph.map((h,i)=>({wch:i===0?28:(String(h).includes('%')?13:Math.max(12,Math.min(18,String(h).length+1)))}));ws2['!rows']=[{hpt:27},{hpt:20},{hpt:22},{hpt:8},{hpt:38}];ws2['!freeze']={xSplit:1,ySplit:5};
- XLSX.utils.book_append_sheet(wb,ws2,'PARCIAIS POR ESCOLA');
 
- // Ordem das abas como no arquivo original
- wb.SheetNames=['ENTRADA DE DADOS','PARCIAIS POR ESCOLA','APURAÇÃO','Planilha2'];
+ function criarParcialPorEscola(tipo){
+   let ph=['ESCOLA','TOTAL DE SEÇÕES','SEÇÕES APURADAS','ELEITORES DA ESCOLA','COMPARECIMENTO'];
+   let titulo='', sheetName='';
+   if(tipo==='P'){
+     titulo='RESULTADOS PARCIAIS POR ESCOLA — PRESIDENTE — EXPORTAÇÃO Nº '+exportNo;
+     sheetName='PARCIAIS PRESIDENTE';
+     ph.push('PRES. VÁLIDOS');
+     pres.forEach(n=>ph.push('PRES. '+n,'PRES. '+n+' % COMPAR.','PRES. '+n+' % VÁL.','PRES. '+n+' % ELEITOR'));
+   }else if(tipo==='G'){
+     titulo='RESULTADOS PARCIAIS POR ESCOLA — GOVERNADOR — EXPORTAÇÃO Nº '+exportNo;
+     sheetName='PARCIAIS GOVERNADOR';
+     ph.push('GOV. VÁLIDOS');
+     gov.forEach(n=>ph.push('GOV. '+n,'GOV. '+n+' % COMPAR.','GOV. '+n+' % VÁL.','GOV. '+n+' % ELEITOR'));
+   }else{
+     titulo='RESULTADOS PARCIAIS POR ESCOLA — BARROS MUNHOZ — EXPORTAÇÃO Nº '+exportNo;
+     sheetName='PARCIAIS BM';
+     ph.push('DEP. EST. VÁLIDOS','BM','BM % COMPAR.','BM % VÁL.','BM % ELEITOR');
+   }
+   ph.push('% SEÇÕES APURADAS');
+
+   const par=[[titulo],['Atualização automática conforme os Boletins de Urna capturados | '+exportStamp],['Percentuais calculados sobre Comparecimento, Votos Válidos do cargo e Eleitores da escola.'],[],ph];
+   schools.forEach(s=>par.push([s]));
+   par.push(['TOTAL GERAL']);
+
+   const ws=XLSX.utils.aoa_to_sheet(par);
+   ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:ph.length-1}},{s:{r:1,c:0},e:{r:1,c:ph.length-1}},{s:{r:2,c:0},e:{r:2,c:ph.length-1}}];
+   setStyle(ws,'A1:'+col(ph.length-1)+'1',titleStyle);
+   setStyle(ws,'A5:'+col(ph.length-1)+'5',headStyle);
+
+   const sumAp=(r,pc,head)=>{
+     const src=apColByHeader[head];
+     ws[col(pc)+r]={t:'n',f:'SUMIF('+schoolCol+',A'+r+',\'APURAÇÃO\'!$'+src+'$2:$'+src+'$'+apEnd+')'};
+     return col(pc)+r;
+   };
+
+   for(let ri=0;ri<schools.length;ri++){
+     const r=6+ri;
+     ws['B'+r]={t:'n',f:'COUNTIF(Planilha2!$B$2:$B$162,A'+r+')'};
+     ws['C'+r]={t:'n',f:'COUNTIFS('+schoolCol+',A'+r+','+compCol+',"<>")'};
+     ws['D'+r]={t:'n',f:'SUMIF(Planilha2!$B$2:$B$162,A'+r+',Planilha2!$C$2:$C$162)'};
+     ws['E'+r]={t:'n',f:'SUMIF('+schoolCol+',A'+r+','+compCol+')'};
+     let pc=5;
+
+     if(tipo==='P'){
+       const valid=sumAp(r,pc++,'PRES. VÁLIDOS');
+       pres.forEach(n=>{
+         const v=sumAp(r,pc++,'PRES. '+n);
+         ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/$E'+r+',0)',z:'0.0%'};
+         ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/'+valid+',0)',z:'0.0%'};
+         ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/$D'+r+',0)',z:'0.0%'};
+       });
+     }else if(tipo==='G'){
+       const valid=sumAp(r,pc++,'GOV. VÁLIDOS');
+       gov.forEach(n=>{
+         const v=sumAp(r,pc++,'GOV. '+n);
+         ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/$E'+r+',0)',z:'0.0%'};
+         ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/'+valid+',0)',z:'0.0%'};
+         ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/$D'+r+',0)',z:'0.0%'};
+       });
+     }else{
+       const valid=sumAp(r,pc++,'DEP. EST. VÁLIDOS');
+       const v=sumAp(r,pc++,'BM');
+       ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/$E'+r+',0)',z:'0.0%'};
+       ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/'+valid+',0)',z:'0.0%'};
+       ws[col(pc++)+r]={t:'n',f:'IFERROR('+v+'/$D'+r+',0)',z:'0.0%'};
+     }
+     ws[col(pc)+r]={t:'n',f:'IFERROR($C'+r+'/$B'+r+',0)',z:'0.0%'};
+     const fill=ri%2?WHITE:ALT;
+     setStyle(ws,'A'+r+':'+col(ph.length-1)+r,{fill:{fgColor:{rgb:fill}},border:grid});
+   }
+
+   const tr=6+schools.length;
+   for(let C=1;C<ph.length;C++){
+     const L=col(C), h=ph[C];
+     if(C<=4){
+       ws[L+tr]={t:'n',f:'SUM('+L+'6:'+L+(tr-1)+')'};
+     }else if(h==='% SEÇÕES APURADAS'){
+       ws[L+tr]={t:'n',f:'IFERROR(C'+tr+'/B'+tr+',0)',z:'0.0%'};
+     }else if(h.includes('%')){
+       const voteHead=h.split(' % ')[0], voteC=ph.indexOf(voteHead), vL=col(voteC);
+       if(h.includes('% COMPAR.')) ws[L+tr]={t:'n',f:'IFERROR('+vL+tr+'/E'+tr+',0)',z:'0.0%'};
+       else if(h.includes('% ELEITOR')) ws[L+tr]={t:'n',f:'IFERROR('+vL+tr+'/D'+tr+',0)',z:'0.0%'};
+       else {
+         let den='';
+         if(tipo==='P') den=col(ph.indexOf('PRES. VÁLIDOS'));
+         else if(tipo==='G') den=col(ph.indexOf('GOV. VÁLIDOS'));
+         else den=col(ph.indexOf('DEP. EST. VÁLIDOS'));
+         ws[L+tr]={t:'n',f:'IFERROR('+vL+tr+'/'+den+tr+',0)',z:'0.0%'};
+       }
+     }else{
+       ws[L+tr]={t:'n',f:'SUM('+L+'6:'+L+(tr-1)+')'};
+     }
+   }
+
+   setStyle(ws,'A'+tr+':'+col(ph.length-1)+tr,{font:{bold:true,color:{rgb:WHITE}},fill:{fgColor:{rgb:BLUE}},border:grid,alignment:{horizontal:'center'}});
+   for(let C=0;C<ph.length;C++) if(ph[C].includes('%')) for(let r=6;r<=tr;r++){
+     const a=col(C)+r;if(ws[a])ws[a].s={...(ws[a].s||{}),numFmt:'0.0%',alignment:{horizontal:'center'},border:grid};
+   }
+   ws['!cols']=ph.map((h,i)=>({wch:i===0?28:(String(h).includes('%')?13:Math.max(12,Math.min(18,String(h).length+1)))}));
+   ws['!rows']=[{hpt:27},{hpt:20},{hpt:22},{hpt:8},{hpt:38}];
+   ws['!freeze']={xSplit:1,ySplit:5};
+   XLSX.utils.book_append_sheet(wb,ws,sheetName);
+ }
+
+ criarParcialPorEscola('P');
+ criarParcialPorEscola('G');
+ criarParcialPorEscola('BM');
+
+ // Ordem das abas
+ wb.SheetNames=['ENTRADA DE DADOS','PARCIAIS PRESIDENTE','PARCIAIS GOVERNADOR','PARCIAIS BM','APURAÇÃO','Planilha2'];
  const ordered={};wb.SheetNames.forEach(n=>ordered[n]=wb.Sheets[n]);wb.Sheets=ordered;
  XLSX.writeFile(wb,'CONTROLE_VOTACAO_PRES_GOV_BM_EXP_'+exportNo+'.xlsx',{cellStyles:true});
 }
