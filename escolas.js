@@ -1,0 +1,1 @@
+window.AUDITABU_ESCOLAS={};
