@@ -31,21 +31,22 @@ $('#candidateTemplate').onclick=()=>download('modelo-candidatos.csv','text/csv;c
 function exportControleEleitoral(){
  if(typeof XLSX==='undefined'){alert('Biblioteca do Excel não carregou.');return}
  const bus=db.bus.filter(b=>!b.meta.uf||b.meta.uf==='SP'); if(!bus.length){alert('Não há BUs de SP para exportar.');return}
- const bm='55855';
- const detail=[['SEÇÃO','ESCOLA','ELEITORES TOTAL','COMPARECIMENTO','VOTOS VÁLIDOS','VOTOS BM']];
- for(const b of bus.slice().sort((x,y)=>(+x.meta.secao||0)-(+y.meta.secao||0))){
-   const d=b.votes['7']||{}, validos=Object.values(d.nominal||{}).reduce((a,v)=>a+(+v||0),0);
-   detail.push([String(+b.meta.secao||b.meta.secao),(window.AUDITABU_ESCOLAS||{})[String(+b.meta.secao||b.meta.secao)]||'NÃO CADASTRADA','',d.total||'',validos,d.nominal?.[bm]||0]);
- }
- const escolas={}; detail.slice(1).forEach(r=>{let k=r[1];escolas[k]??={secs:0,comp:0,val:0,bm:0};let o=escolas[k];o.secs++;o.comp+=+r[3]||0;o.val+=+r[4]||0;o.bm+=+r[5]||0});
- const parcial=[['RESULTADOS PARCIAIS POR ESCOLA — BARROS MUNHOZ'],[],['ESCOLA','SEÇÕES APURADAS','COMPARECIMENTO','VOTOS VÁLIDOS','VOTOS BM','% BM / VÁLIDOS','% BM / COMPARECIMENTO']];
- Object.entries(escolas).sort().forEach(([k,o])=>parcial.push([k,o.secs,o.comp,o.val,o.bm,o.val?o.bm/o.val:0,o.comp?o.bm/o.comp:0]));
- const comp=detail.slice(1).reduce((t,r)=>t+(+r[3]||0),0),val=detail.slice(1).reduce((t,r)=>t+(+r[4]||0),0),vb=detail.slice(1).reduce((t,r)=>t+(+r[5]||0),0);
- const total=[['APURAÇÃO — BARROS MUNHOZ'],[],['SEÇÕES APURADAS','COMPARECIMENTO','VOTOS VÁLIDOS','VOTOS BM','% BM / VÁLIDOS','% BM / COMPARECIMENTO'],[detail.length-1,comp,val,vb,val?vb/val:0,comp?vb/comp:0]];
- let w=XLSX.utils.book_new();
- [['ENTRADA DE DADOS',detail],['PARCIAIS POR ESCOLA',parcial],['APURAÇÃO',total]].forEach(([n,d])=>{let ws=XLSX.utils.aoa_to_sheet(d);XLSX.utils.book_append_sheet(w,ws,n)});
- ['PARCIAIS POR ESCOLA','APURAÇÃO'].forEach(n=>{let ws=w.Sheets[n];Object.keys(ws).forEach(a=>{if(/^[FG]\d+$/.test(a)&&typeof ws[a].v==='number')ws[a].z='0.00%'})});
- XLSX.writeFile(w,'CONTROLE_VOTACAO_BM_AuditaBU_2026.xlsx')
+ const bm='55855', cargo='7';
+ const sections=bus.slice().sort((x,y)=>(+x.meta.secao||0)-(+y.meta.secao||0));
+ const entrada=[['CONTROLE DE VOTAÇÃO — BARROS MUNHOZ (BM)'],['Dados extraídos automaticamente dos Boletins de Urna capturados.'],[],['SEÇÃO','ESCOLA DE VOTAÇÃO','COMPARECIMENTO','VOTOS VÁLIDOS','VOTOS BM']];
+ for(const b of sections){let v=b.votes[cargo]||{}, valid=Object.values(v.nominal||{}).reduce((t,q)=>t+(+q||0),0);entrada.push([String(+b.meta.secao||b.meta.secao),(window.AUDITABU_ESCOLAS||{})[String(+b.meta.secao||b.meta.secao)]||'NÃO CADASTRADA',v.total||'',valid,v.nominal?.[bm]||0])}
+ const bySchool={}; for(const r of entrada.slice(4)){let s=r[1];bySchool[s]??={n:0,comp:0,val:0,bm:0};let o=bySchool[s];o.n++;o.comp+=+r[2]||0;o.val+=+r[3]||0;o.bm+=+r[4]||0}
+ const par=[['RESULTADOS PARCIAIS POR ESCOLA — BARROS MUNHOZ'],['Percentuais calculados sobre as urnas/seções já apuradas.'],[],['ESCOLA','SEÇÕES APURADAS','COMPARECIMENTO','VOTOS VÁLIDOS','VOTOS BM','% BM / VÁLIDOS','% BM / COMPARECIMENTO']];
+ Object.keys(bySchool).sort().forEach(s=>{let o=bySchool[s];par.push([s,o.n,o.comp,o.val,o.bm,o.val?o.bm/o.val:0,o.comp?o.bm/o.comp:0])});
+ const comp=entrada.slice(4).reduce((t,r)=>t+(+r[2]||0),0), valid=entrada.slice(4).reduce((t,r)=>t+(+r[3]||0),0), bmTot=entrada.slice(4).reduce((t,r)=>t+(+r[4]||0),0);
+ par.push(['TOTAL GERAL',sections.length,comp,valid,bmTot,valid?bmTot/valid:0,comp?bmTot/comp:0]);
+ const ap=[['APURAÇÃO — BARROS MUNHOZ'],[],['INDICADOR','TOTAL','PERCENTUAL SOBRE URNAS APURADAS'],['URNAS/SEÇÕES APURADAS',sections.length,''],['COMPARECIMENTO',comp,'100%'],['VOTOS VÁLIDOS',valid,comp?valid/comp:0],['VOTOS BM',bmTot,comp?bmTot/comp:0],['% BM SOBRE VOTOS VÁLIDOS','',valid?bmTot/valid:0]];
+ let w=XLSX.utils.book_new(),ws1=XLSX.utils.aoa_to_sheet(entrada),ws2=XLSX.utils.aoa_to_sheet(par),ws3=XLSX.utils.aoa_to_sheet(ap);
+ ws1['!cols']=[{wch:10},{wch:32},{wch:18},{wch:18},{wch:14}];ws2['!cols']=[{wch:32},{wch:18},{wch:18},{wch:18},{wch:14},{wch:18},{wch:22}];ws3['!cols']=[{wch:30},{wch:18},{wch:30}];
+ for(let r=4;r<par.length;r++){ws2['F'+(r+1)]&&(ws2['F'+(r+1)].z='0.00%');ws2['G'+(r+1)]&&(ws2['G'+(r+1)].z='0.00%')}
+ ['C6','C7','C8'].forEach(c=>{if(ws3[c])ws3[c].z='0.00%'});
+ XLSX.utils.book_append_sheet(w,ws1,'ENTRADA DE DADOS');XLSX.utils.book_append_sheet(w,ws2,'PARCIAIS POR ESCOLA');XLSX.utils.book_append_sheet(w,ws3,'APURAÇÃO');
+ XLSX.writeFile(w,'CONTROLE_VOTACAO_BM_3_PLANILHAS.xlsx')
 }
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});render();
