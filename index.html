@@ -25,4 +25,4 @@ window.addEventListener('load',function(){
  };
  document.querySelector('#adminEnter').onclick=async()=>{const email=document.querySelector('#adminEmail').value.trim(),password=document.querySelector('#adminPass').value;const r=await authClient.auth.signInWithPassword({email,password});if(r.error){document.querySelector('#adminMsg').textContent='Não foi possível entrar: '+r.error.message;return}await window.loadAdmin()};
 });
-</script></body></html>
+</script><script>window.addEventListener('load',function(){var b=document.getElementById('adminClearCentral');if(!b)return;b.onclick=async function(){if(!confirm('Apagar todos os BUs e votos da base central?'))return;if(!confirm('Confirma a limpeza definitiva da base central?'))return;b.disabled=true;var r=await authClient.rpc('limpar_base_central');b.disabled=false;if(r.error){alert('Erro: '+r.error.message);return}alert('Base central zerada com sucesso.');if(window.loadAdmin)await window.loadAdmin();};});</script></body></html>
