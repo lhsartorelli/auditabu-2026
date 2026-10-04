@@ -233,7 +233,7 @@ function exportControleEleitoral(){
  const ordered={};wb.SheetNames.forEach(n=>ordered[n]=wb.Sheets[n]);wb.Sheets=ordered;
  XLSX.writeFile(wb,'CONTROLE_VOTACAO_PRES_GOV_BM_EXP_'+exportNo+'.xlsx',{cellStyles:true});
 }
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});render();refreshCentral();setInterval(refreshCentral,5000);window.addEventListener('focus',refreshCentral);
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js?v=13').catch(()=>{});render();refreshCentral();setInterval(refreshCentral,5000);window.addEventListener('focus',refreshCentral);
 
 const authClient=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 async function loadAdmin(){
