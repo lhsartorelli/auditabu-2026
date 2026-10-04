@@ -37,7 +37,10 @@ $('#candidateTemplate').onclick=()=>download('modelo-candidatos.csv','text/csv;c
 
 function exportControleEleitoral(){
  if(typeof XLSX==='undefined'){alert('Biblioteca do Excel não carregou.');return}
- const bus=db.bus.filter(b=>(!b.meta.uf||b.meta.uf==='SP')&&String(+b.meta.zona||b.meta.zona)==='54').slice().sort((a,b)=>(+a.meta.secao||0)-(+b.meta.secao||0));
+ const filtrados=db.bus.filter(b=>(!b.meta.uf||b.meta.uf==='SP')&&String(+b.meta.zona||b.meta.zona)==='54');
+ const unicos=new Map();
+ filtrados.forEach((b,i)=>{const k=[b.meta.pleito||'',b.meta.uf||'',b.meta.zona||'',String(+b.meta.secao||b.meta.secao),b.meta.turno||''].join('|');unicos.set(k,{b,i})});
+ const bus=[...unicos.values()].sort((x,y)=>x.i-y.i).map(x=>x.b).sort((a,b)=>(+a.meta.secao||0)-(+b.meta.secao||0));
  if(!bus.length){alert('Não há BUs da Zona 054 para exportar.');return}
  const exportKey='auditabu2026.export.seq', exportSeq=(parseInt(localStorage.getItem(exportKey)||'0',10)||0)+1;
  localStorage.setItem(exportKey,String(exportSeq));
@@ -70,7 +73,7 @@ function exportControleEleitoral(){
  pres.forEach(n=>entHeaders.push('PRES. '+label('1',n)));
  entHeaders.push('GOV. VÁLIDOS'); gov.forEach(n=>entHeaders.push('GOV. '+label('3',n)));
  entHeaders.push('DEP. EST. VÁLIDOS','BARROS MUNHOZ (55855)');
- const ent=[['CONTROLE DE VOTAÇÃO — LANÇAMENTO POR SEÇÃO — EXPORTAÇÃO Nº '+exportNo],['Dados extraídos automaticamente dos Boletins de Urna capturados. Exportação nº '+exportNo+' — '+exportStamp],['Os dados são refletidos nas abas APURAÇÃO e PARCIAIS POR ESCOLA.'],entHeaders];
+ const ent=[['CONTROLE DE VOTAÇÃO — LANÇAMENTO POR SEÇÃO — EXPORTAÇÃO Nº '+exportNo],['Dados extraídos automaticamente dos Boletins de Urna capturados. Exportação nº '+exportNo+' — '+exportStamp],['Os dados são refletidos nas abas APURAÇÃO, PARCIAIS PRESIDENTE, PARCIAIS GOVERNADOR e PARCIAIS BM.'],entHeaders];
  data.forEach(x=>{let r=[+x.sec,x.school,x.voters,x.comp,x.pv];pres.forEach(n=>r.push(+x.p.nominal?.[n]||0));r.push(x.gv);gov.forEach(n=>r.push(+x.g.nominal?.[n]||0));r.push(x.dv,x.bm);ent.push(r)});
  while(ent.length<504)ent.push(new Array(entHeaders.length).fill(''));
  const ws1=XLSX.utils.aoa_to_sheet(ent);
