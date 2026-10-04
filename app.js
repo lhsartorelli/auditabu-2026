@@ -31,13 +31,21 @@ $('#candidateTemplate').onclick=()=>download('modelo-candidatos.csv','text/csv;c
 function exportControleEleitoral(){
  if(typeof XLSX==='undefined'){alert('Biblioteca do Excel não carregou.');return}
  const bus=db.bus.filter(b=>!b.meta.uf||b.meta.uf==='SP'); if(!bus.length){alert('Não há BUs de SP para exportar.');return}
- const cand=[]; for(const cargo of ['1','3']){let ns=new Set();bus.forEach(b=>Object.keys(b.votes[cargo]?.nominal||{}).forEach(n=>ns.add(n)));[...ns].sort((a,b)=>+a-+b).forEach(n=>cand.push({cargo,num:n}))} cand.push({cargo:'7',num:'55855'});
- const label=x=>{let ci=x.num==='55855'?{nome:'Barros Munhoz',partido:candidateInfo('7','55855','SP').partido}:candidateInfo(x.cargo,x.num,'SP');return (x.cargo==='1'?'PRESIDENTE':x.cargo==='3'?'GOVERNADOR':'DEP. ESTADUAL')+' — '+ci.nome+(ci.partido?' — '+ci.partido:'')+' — '+x.num};
- let head=['SEÇÃO','ESCOLA','UF','ZONA','URNA','TURNO','COMPARECIMENTO',...cand.map(label),'BRANCOS PRES.','NULOS PRES.','BRANCOS GOV.','NULOS GOV.'], detail=[head];
- for(const b of bus.slice().sort((x,y)=>(+x.meta.secao||0)-(+y.meta.secao||0))){let sec=String(+b.meta.secao||b.meta.secao),p=b.votes['1']||{},g=b.votes['3']||{},r=[sec,(window.AUDITABU_ESCOLAS||{})[sec]||'NÃO CADASTRADA',b.meta.uf,b.meta.zona,b.meta.urna,b.meta.turno,p.total||g.total||''];cand.forEach(c=>r.push(b.votes[c.cargo]?.nominal?.[c.num]||0));r.push(p.branco||0,p.nulo||0,g.branco||0,g.nulo||0);detail.push(r)}
- let sm={};detail.slice(1).forEach(r=>{let s=r[1];sm[s]??={sec:new Set(),rows:[],comp:0};sm[s].sec.add(r[0]);sm[s].rows.push(r);sm[s].comp+=+r[6]||0});let partial=[['RESULTADOS PARCIAIS POR ESCOLA'],[],['ESCOLA','SEÇÕES APURADAS','COMPARECIMENTO',...cand.map(label)]];Object.keys(sm).sort().forEach(s=>{let o=sm[s],r=[s,o.sec.size,o.comp];cand.forEach((_,j)=>r.push(o.rows.reduce((t,x)=>t+(+x[7+j]||0),0)));partial.push(r)});
- let total=[['APURAÇÃO ACUMULADA'],[],['CARGO','NÚMERO','CANDIDATO','PARTIDO','VOTOS']];cand.forEach((c,j)=>{let ci=c.num==='55855'?{nome:'Barros Munhoz',partido:candidateInfo('7','55855','SP').partido}:candidateInfo(c.cargo,c.num,'SP');total.push([c.cargo==='1'?'PRESIDENTE':c.cargo==='3'?'GOVERNADOR':'DEPUTADO ESTADUAL',c.num,ci.nome,ci.partido,detail.slice(1).reduce((t,r)=>t+(+r[7+j]||0),0)])});
- let w=XLSX.utils.book_new();[['ENTRADA DE DADOS',detail],['PARCIAIS POR ESCOLA',partial],['APURAÇÃO',total]].forEach(([n,d])=>XLSX.utils.book_append_sheet(w,XLSX.utils.aoa_to_sheet(d),n));XLSX.writeFile(w,'CONTROLE_VOTACAO_AuditaBU_2026.xlsx')
+ const bm='55855';
+ const detail=[['SEÇÃO','ESCOLA','ELEITORES TOTAL','COMPARECIMENTO','VOTOS VÁLIDOS','VOTOS BM']];
+ for(const b of bus.slice().sort((x,y)=>(+x.meta.secao||0)-(+y.meta.secao||0))){
+   const d=b.votes['7']||{}, validos=Object.values(d.nominal||{}).reduce((a,v)=>a+(+v||0),0);
+   detail.push([String(+b.meta.secao||b.meta.secao),(window.AUDITABU_ESCOLAS||{})[String(+b.meta.secao||b.meta.secao)]||'NÃO CADASTRADA','',d.total||'',validos,d.nominal?.[bm]||0]);
+ }
+ const escolas={}; detail.slice(1).forEach(r=>{let k=r[1];escolas[k]??={secs:0,comp:0,val:0,bm:0};let o=escolas[k];o.secs++;o.comp+=+r[3]||0;o.val+=+r[4]||0;o.bm+=+r[5]||0});
+ const parcial=[['RESULTADOS PARCIAIS POR ESCOLA — BARROS MUNHOZ'],[],['ESCOLA','SEÇÕES APURADAS','COMPARECIMENTO','VOTOS VÁLIDOS','VOTOS BM','% BM / VÁLIDOS','% BM / COMPARECIMENTO']];
+ Object.entries(escolas).sort().forEach(([k,o])=>parcial.push([k,o.secs,o.comp,o.val,o.bm,o.val?o.bm/o.val:0,o.comp?o.bm/o.comp:0]));
+ const comp=detail.slice(1).reduce((t,r)=>t+(+r[3]||0),0),val=detail.slice(1).reduce((t,r)=>t+(+r[4]||0),0),vb=detail.slice(1).reduce((t,r)=>t+(+r[5]||0),0);
+ const total=[['APURAÇÃO — BARROS MUNHOZ'],[],['SEÇÕES APURADAS','COMPARECIMENTO','VOTOS VÁLIDOS','VOTOS BM','% BM / VÁLIDOS','% BM / COMPARECIMENTO'],[detail.length-1,comp,val,vb,val?vb/val:0,comp?vb/comp:0]];
+ let w=XLSX.utils.book_new();
+ [['ENTRADA DE DADOS',detail],['PARCIAIS POR ESCOLA',parcial],['APURAÇÃO',total]].forEach(([n,d])=>{let ws=XLSX.utils.aoa_to_sheet(d);XLSX.utils.book_append_sheet(w,ws,n)});
+ ['PARCIAIS POR ESCOLA','APURAÇÃO'].forEach(n=>{let ws=w.Sheets[n];Object.keys(ws).forEach(a=>{if(/^[FG]\d+$/.test(a)&&typeof ws[a].v==='number')ws[a].z='0.00%'})});
+ XLSX.writeFile(w,'CONTROLE_VOTACAO_BM_AuditaBU_2026.xlsx')
 }
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});render();
